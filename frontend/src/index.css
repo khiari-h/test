@@ -1,0 +1,30 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Oswald:wght@400;700&family=Roboto:wght@400;700&family=Montserrat:wght@400;700&display=swap');
+
+.bg-global {
+  @apply bg-concert-bg-beige;
+}
+
+.h1-class {
+  @apply font-concert-title text-black text-2xl font-bold;
+}
+
+.h2-class {
+  @apply font-concert-subtitle text-black text-xl font-bold;
+}
+
+.h3-class {
+  @apply font-concert-subtitle text-black text-lg font-bold;
+}
+
+
+.p-class {
+  @apply font-concert-description text-black;
+}
+
+.a-class {
+  @apply text-light-blue hover:text-white;
+}

@@ -1,0 +1,90 @@
+name: CI/CD for React and Laravel
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4  # Extraction du code source
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4  # Configuration de Node.js
+      with:
+        node-version: '20'  # Utilisation de Node.js 20
+
+    - name: Install dependencies
+      run: npm install
+      working-directory: ./frontend  # Répertoire du frontend
+
+    - name: Run tests
+      run: npm test
+      working-directory: ./frontend  # Répertoire du frontend
+
+  build-backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: nationsoundstest 
+        
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4  # Extraction du code source
+
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2  # Configuration de PHP
+      with:
+        php-version: '8.2'  # Utilisation de PHP 8.2
+
+    - name: Generate Laravel APP_KEY
+      id: generate_key
+      run: echo "::set-output name=key::$(php artisan key:generate --show)"
+      working-directory: ./backend
+
+    - name: Set up .env file
+      run: |
+        echo "APP_NAME=Laravel" > ./backend/.env
+        echo "APP_ENV=testing" >> ./backend/.env
+        echo "APP_KEY=${{ steps.generate_key.outputs.key }}" >> ./backend/.env
+        echo "APP_DEBUG=false" >> ./backend/.env
+        echo "APP_URL=http://localhost" >> ./backend/.env
+        echo "DB_CONNECTION=mysql" >> ./backend/.env
+        echo "DB_HOST=127.0.0.1" >> ./backend/.env  # Utilisation de 127.0.0.1
+        echo "DB_PORT=3306" >> ./backend/.env
+        echo "DB_DATABASE=test" >> ./backend/.env
+        echo "DB_USERNAME=root" >> ./backend/.env
+        echo "DB_PASSWORD=root" >> ./backend/.env
+
+      working-directory: ./
+
+    - name: Install Composer dependencies
+      run: composer install
+      working-directory: ./backend
+
+    - name: Run migrations
+      run: php artisan migrate --no-interaction --force
+      working-directory: ./backend
+
+    - name: Run tests
+      run: php artisan test
+      working-directory: ./backend
