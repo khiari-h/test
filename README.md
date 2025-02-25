@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # NationSounds
 
 NationSounds est un projet de festival de musique qui offre des informations complètes sur les concerts, les rencontres avec les artistes, ainsi que les informations pratiques sur le festival. Il comprend également une carte interactive pour se repérer, avec la localisation des scènes et les concerts en cours.
@@ -143,3 +144,6 @@ Ce projet est sous licence libre classique. Vous êtes libre de l'utiliser, le m
 
 Contact
 Pour toute question ou support, vous pouvez contacter Hamdane KHIARI.
+=======
+# test
+>>>>>>> 57b596023029413f458a3ae019b7abba72b98465
