@@ -1,79 +1,125 @@
-describe('Gestion des Actualités', () => {
-    beforeEach(() => {
-      // Simuler une connexion et accéder à la page de gestion des actualités
-      cy.visit('http://localhost:3000/admin/login')
-      cy.get('input[type="email"]').type('admin@example.com')
-      cy.get('input[type="password"]').type('motdepasse123')
-      cy.get('button[type="submit"]').click()
-      cy.visit('/admin/news')
-    })
+describe('Gestion des Actualités - CRUD', () => {
+  // Configuration de base
+  const adminEmail = 'hamdane.khiari@gmail.com'
+  const adminPassword = 'Admin123!'
   
-    it('Doit charger la page de gestion des actualités', () => {
-      cy.get('h1').contains('Gestion des Actualités').should('be.visible')
-      cy.get('table').should('be.visible')
-      cy.get('button').contains('Ajouter une Actualité').should('be.visible')
-    })
+  // Utilitaire pour générer un titre unique
+  const generateUniqueTitle = () => `Actualité Test ${Date.now()}`
+
+  // Gestion des exceptions
+  beforeEach(() => {
+    cy.on('uncaught:exception', () => false)
+  })
+
+  // Connexion et navigation avant chaque test
+  beforeEach(() => {
+    // Connexion
+    cy.visit('http://localhost:3000/admin/login')
+    cy.get('input[type="email"]').type(adminEmail)
+    cy.get('input[type="password"]').type(adminPassword)
+    cy.get('button[type="submit"]').click()
+
+    // Vérification de la connexion et navigation
+    cy.url().should('include', '/admin/dashboard')
+    cy.contains('Actualités').click()
+    cy.url().should('include', '/admin/news')
+  })
+
+  it('Doit afficher la liste des actualités depuis le backend', () => {
+    // Attendre le chargement de la page
+    cy.wait(1000)
   
-    it('Doit ouvrir le formulaire d\'ajout d\'actualité', () => {
-      cy.contains('Ajouter une Actualité').click()
-      
-      // Vérifier la présence des champs du formulaire
-      cy.get('input[placeholder="Titre de l\'actualité"]').should('be.visible')
-      cy.get('select').contains('Catégorie').should('be.visible')
-      cy.get('select').contains('Importance').should('be.visible')
-      cy.get('textarea[placeholder="Description de l\'actualité"]').should('be.visible')
-    })
+    // Vérifier que le tableau est visible
+    cy.get('table').should('be.visible')
   
-    it('Doit ajouter une nouvelle actualité', () => {
-      cy.contains('Ajouter une Actualité').click()
-      
-      // Remplir le formulaire
-      cy.get('input[placeholder="Titre de l\'actualité"]').type('Actualité de Test')
-      
-      // Sélectionner la catégorie
-      cy.get('select').eq(0).select('Concert')
-      
-      // Sélectionner l'importance
-      cy.get('select').eq(1).select('Moyenne')
-      
-      // Ajouter une description
-      cy.get('textarea[placeholder="Description de l\'actualité"]').type('Description détaillée de l\'actualité de test')
-      
-      // Soumettre le formulaire
-      cy.get('button').contains('Enregistrer').click()
-      
-      // Vérifier l'ajout dans le tableau
-      cy.get('table').contains('Actualité de Test').should('be.visible')
-    })
+    // Vérifier que le tableau contient des lignes
+    cy.get('tbody tr').should('have.length.greaterThan', 0)
   
-    it('Doit permettre la suppression d\'une actualité', () => {
-      // Intercepter la requête de suppression
-      cy.intercept('DELETE', '/api/news/*').as('deleteNews')
+    // Vérifier les en-têtes du tableau
+    cy.get('thead th').should('contain', 'Titre')
+    cy.get('thead th').should('contain', 'Catégorie')
+    cy.get('thead th').should('contain', 'Importance')
+  
+    // Vérifier que chaque ligne a les colonnes attendues
+    cy.get('tbody tr').each(($row) => {
+      cy.wrap($row).find('td').should('have.length', 4) // Titre, Catégorie, Importance, Actions
       
-      // Trouver et supprimer la première actualité
-      cy.get('table tbody tr').first().then(($row) => {
-        const newsTitle = $row.find('td:first').text()
-        
-        // Cliquer sur le bouton Supprimer
-        cy.wrap($row).find('button').contains('Supprimer').click()
-        
-        // Attendre la suppression
-        cy.wait('@deleteNews')
-        
-        // Vérifier que l'actualité n'est plus dans la liste
-        cy.get('table').should('not.contain', newsTitle)
+      // Vérifier que chaque colonne n'est pas vide
+      cy.wrap($row).find('td').each(($cell) => {
+        cy.wrap($cell).invoke('text').should('not.be.empty')
       })
     })
+  })
   
-    it('Doit afficher un message d\'erreur pour un formulaire incomplet', () => {
-      cy.contains('Ajouter une Actualité').click()
-      
-      // Tenter de soumettre un formulaire vide
-      cy.get('button').contains('Enregistrer').click()
-      
-      // Vérifier les contraintes de validation HTML5
-      cy.get('input[placeholder="Titre de l\'actualité"]:invalid').should('exist')
-      cy.get('select:invalid').should('exist')
-      cy.get('textarea[placeholder="Description de l\'actualité"]:invalid').should('exist')
+  it('Doit créer une nouvelle actualité', () => {
+    // Générer un titre unique
+    const newsTitle = generateUniqueTitle()
+
+    // Ouvrir le formulaire d'ajout
+    cy.contains('Ajouter une Actualité').click()
+
+    // Remplir le formulaire
+    cy.get('input[placeholder="Titre de l\'actualité"]')
+      .should('be.visible')
+      .type(newsTitle)
+
+    cy.get('select').eq(0) // Catégorie
+      .should('be.visible')
+      .select('Festival')
+
+    cy.get('select').eq(1) // Importance
+      .should('be.visible')
+      .select('Moyenne')
+
+    cy.get('textarea')
+      .should('be.visible')
+      .type('Description détaillée pour le test de création d\'actualité')
+
+    // Soumettre le formulaire
+    cy.get('form button[type="submit"]').click()
+
+    // Vérifier la création
+    cy.contains(newsTitle).should('be.visible')
+  })
+
+  it('Doit modifier une actualité existante', () => {
+    // Attendre le chargement
+    cy.wait(1000)
+
+    // Sélectionner la première actualité
+    cy.get('tbody tr').first().find('button').contains('Modifier').click()
+
+    // Générer un nouveau titre
+    const newTitle = generateUniqueTitle()
+
+    // Modifier le titre
+    cy.get('input[placeholder="Titre de l\'actualité"]')
+      .should('be.visible')
+      .clear()
+      .type(newTitle)
+
+    // Soumettre la modification
+    cy.get('form button[type="submit"]').click()
+
+    // Vérifier le nouveau titre
+    cy.contains(newTitle).should('be.visible')
+  })
+
+  it('Doit supprimer une actualité', () => {
+    // Attendre le chargement
+    cy.wait(1000)
+
+    // Récupérer le titre de la première actualité
+    cy.get('tbody tr').first().find('td').eq(0).invoke('text').then((title) => {
+      // Supprimer l'actualité
+      cy.get('tbody tr').first().find('button').contains('Supprimer').click()
+
+      // Confirmer la suppression
+      cy.on('window:confirm', () => true)
+
+      // Vérifier la suppression
+      cy.wait(1000)
+      cy.contains(title).should('not.exist')
     })
   })
+})

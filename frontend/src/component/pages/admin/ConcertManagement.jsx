@@ -78,7 +78,7 @@ const ConcertManagement = () => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce concert ?')) return;
     
     try {
-      await axios.delete(`/admin/concerts/${concertId}`);
+      await axios.delete(`/api/admin/concerts/${concertId}`);
       fetchConcerts();
     } catch (err) {
       setError('Erreur lors de la suppression');

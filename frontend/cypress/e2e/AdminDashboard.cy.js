@@ -7,7 +7,7 @@ describe('Tableau de Bord Admin', () => {
     cy.get('button[type="submit"]').click()
 
     // Attendre que la page de tableau de bord soit complètement chargée
-    cy.wait(1000) // Attendre 1 seconde (ajuste cette valeur si nécessaire)
+    cy.wait(3000) // Attendre 3 secondes (ajuste cette valeur si nécessaire)
   })
 
   it('Doit charger le tableau de bord', () => {

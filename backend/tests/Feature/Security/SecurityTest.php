@@ -9,19 +9,6 @@ use App\Models\News;
 
 class SecurityTest extends TestCase
 {
-    /** @test */
-    public function it_validates_newsletter_subscription_input()
-    {
-        // Utilise postJson pour s'assurer que la réponse est bien en JSON
-        $response = $this->postJson('/api/newsletter', [
-            'email' => 'not-an-email', // Email invalide pour le test
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-        ]);
-
-        $response->assertStatus(422); // Vérifie que le statut de réponse est bien 422
-        $response->assertJsonValidationErrors('email'); // Vérifie que l'erreur de validation est sur le champ email
-    }
 
     /** @test */
     public function it_prevents_sql_injection_in_news_search()

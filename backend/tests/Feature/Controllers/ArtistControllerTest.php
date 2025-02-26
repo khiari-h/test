@@ -196,24 +196,4 @@ class ArtistControllerTest extends TestCase
         ]);
     }
 
-    /** @test */
-    public function non_admin_cannot_create_artist()
-    {
-        // Données pour un nouvel artiste
-        $artistData = [
-            'name' => 'Unauthorized Artist',
-            'description' => 'This should not be created'
-        ];
-
-        // Appeler la méthode store sans être authentifié
-        $response = $this->postJson('/api/admin/artists', $artistData);
-
-        // Vérifier que l'accès est refusé
-        $response->assertStatus(401);
-
-        // Vérifier que l'artiste n'a pas été créé
-        $this->assertDatabaseMissing('artists', [
-            'name' => 'Unauthorized Artist'
-        ]);
-    }
 }

@@ -14,10 +14,10 @@ class ConcertTest extends TestCase
     /** @test */
     public function it_has_fillable_attributes()
     {
-        // Vérifier que les attributs attendus sont bien fillable
+        // Arrange & Act
         $concert = new Concert();
-        $fillable = $concert->getFillable();
-
+        
+        // Assert
         $this->assertEquals([
             'name',
             'description',
@@ -27,51 +27,83 @@ class ConcertTest extends TestCase
             'end_time',
             'venue',
             'type'
-        ], $fillable);
+        ], $concert->getFillable());
     }
 
     /** @test */
-    public function it_has_date_cast()
+    public function it_casts_date_as_date_object()
     {
-        // Vérifier que l'attribut date est bien cast en type date
+        // Arrange & Act
         $concert = new Concert();
-        $casts = $concert->getCasts();
-
-        $this->assertArrayHasKey('date', $casts);
-        $this->assertEquals('date', $casts['date']);
-    }
-
-    /** @test */
-    public function it_has_artists_relationship()
-    {
-        // Créer un concert et des artistes
-        $concert = Concert::factory()->create();
-        $artist1 = Artist::factory()->create();
-        $artist2 = Artist::factory()->create();
-
-        // Associer les artistes au concert
-        $concert->artists()->attach($artist1, ['is_headliner' => true, 'performance_order' => 1]);
-        $concert->artists()->attach($artist2, ['is_headliner' => false, 'performance_order' => 2]);
-
-        // Vérifier que les relations existent
-        $this->assertCount(2, $concert->artists);
-        $this->assertInstanceOf(Artist::class, $concert->artists->first());
         
-        // Vérifier les données de la table pivot
-        $this->assertTrue($concert->artists[0]->pivot->is_headliner);
-        $this->assertEquals(1, $concert->artists[0]->pivot->performance_order);
-        $this->assertFalse($concert->artists[1]->pivot->is_headliner);
-        $this->assertEquals(2, $concert->artists[1]->pivot->performance_order);
+        // Assert
+        $this->assertArrayHasKey('date', $concert->getCasts());
+        $this->assertEquals('date', $concert->getCasts()['date']);
     }
 
     /** @test */
-    public function concert_date_is_a_carbon_instance()
+    public function it_can_create_a_concert()
     {
-        $concert = Concert::factory()->create([
-            'date' => '2023-12-31'
+        // Arrange
+        $concertData = [
+            'name' => 'Summer Festival',
+            'description' => 'The best summer music event',
+            'image_url' => 'https://example.com/image.jpg',
+            'date' => '2023-07-15',
+            'start_time' => '18:00:00',
+            'end_time' => '23:00:00',
+            'venue' => 'Central Park',
+            'type' => 'Festival'
+        ];
+        
+        // Act
+        $concert = Concert::create($concertData);
+        
+        // Assert
+        $this->assertDatabaseHas('concerts', [
+            'name' => 'Summer Festival',
+            'venue' => 'Central Park'
         ]);
         
-        $this->assertInstanceOf(\Carbon\Carbon::class, $concert->date);
-        $this->assertEquals('2023-12-31', $concert->date->toDateString());
+        $this->assertInstanceOf(Concert::class, $concert);
+    }
+
+    
+    /** @test */
+    public function it_can_update_a_concert()
+    {
+        // Arrange
+        $concert = Concert::factory()->create([
+            'name' => 'Old Name',
+            'venue' => 'Old Venue'
+        ]);
+        
+        // Act
+        $concert->update([
+            'name' => 'Updated Festival',
+            'venue' => 'New Venue'
+        ]);
+        
+        // Assert
+        $this->assertDatabaseHas('concerts', [
+            'id' => $concert->id,
+            'name' => 'Updated Festival',
+            'venue' => 'New Venue'
+        ]);
+    }
+    
+    /** @test */
+    public function it_can_be_deleted()
+    {
+        // Arrange
+        $concert = Concert::factory()->create();
+        
+        // Act
+        $concert->delete();
+        
+        // Assert
+        $this->assertDatabaseMissing('concerts', [
+            'id' => $concert->id
+        ]);
     }
 }

@@ -28,27 +28,36 @@ class ArtistTest extends TestCase
     }
 
     /** @test */
-    public function it_has_concerts_relationship()
-    {
-        // Créer un artiste et des concerts
-        $artist = Artist::factory()->create();
-        $concert1 = Concert::factory()->create();
-        $concert2 = Concert::factory()->create();
+/** @test */
+public function it_has_concerts_relationship()
+{
+    // Créer un artiste et des concerts
+    $artist = Artist::factory()->create();
+    $concert1 = Concert::factory()->create();
+    $concert2 = Concert::factory()->create();
 
-        // Associer les concerts à l'artiste
-        $artist->concerts()->attach($concert1, ['is_headliner' => true, 'performance_order' => 1]);
-        $artist->concerts()->attach($concert2, ['is_headliner' => false, 'performance_order' => 2]);
+    // Associer les concerts à l'artiste
+    $artist->concerts()->attach($concert1, ['is_headliner' => true, 'performance_order' => 1]);
+    $artist->concerts()->attach($concert2, ['is_headliner' => false, 'performance_order' => 2]);
 
-        // Vérifier que les relations existent
-        $this->assertCount(2, $artist->concerts);
-        $this->assertInstanceOf(Concert::class, $artist->concerts->first());
-        
-        // Vérifier les données de la table pivot
-        $this->assertTrue($artist->concerts[0]->pivot->is_headliner);
-        $this->assertEquals(1, $artist->concerts[0]->pivot->performance_order);
-        $this->assertFalse($artist->concerts[1]->pivot->is_headliner);
-        $this->assertEquals(2, $artist->concerts[1]->pivot->performance_order);
-    }
+    // Vérifier que les relations existent
+    $this->assertCount(2, $artist->concerts);
+    $this->assertInstanceOf(Concert::class, $artist->concerts->first());
+
+    // Vérifier les données de la table pivot
+    // Option 1 : Comparaison en utilisant assertEquals avec des entiers
+    $this->assertEquals(1, $artist->concerts[0]->pivot->is_headliner);
+    $this->assertEquals(1, $artist->concerts[0]->pivot->performance_order);
+    $this->assertEquals(0, $artist->concerts[1]->pivot->is_headliner);
+    $this->assertEquals(2, $artist->concerts[1]->pivot->performance_order);
+
+    // Option 2 : Forcer la conversion en booléen
+    // $this->assertTrue((bool)$artist->concerts[0]->pivot->is_headliner);
+    // $this->assertEquals(1, $artist->concerts[0]->pivot->performance_order);
+    // $this->assertFalse((bool)$artist->concerts[1]->pivot->is_headliner);
+    // $this->assertEquals(2, $artist->concerts[1]->pivot->performance_order);
+}
+
 
     /** @test */
     public function it_has_meetings_relationship()

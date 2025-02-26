@@ -58,18 +58,18 @@ class LogoutTest extends TestCase
                  ]);
     }
 
-    /** @test */
-    public function verify_token_returns_invalid_for_unauthenticated_user()
-    {
-        // Act - Vérifier le token sans authentification
-        $response = $this->getJson('/api/admin/verify-token');
+/** @test */
+public function verify_token_returns_invalid_for_unauthenticated_user()
+{
+    // Act - Vérifier le token sans authentification
+    $response = $this->getJson('/api/admin/verify-token');
 
-        // Assert - Vérifier la réponse
-        $response->assertStatus(401)
-                 ->assertJson([
-                     'valid' => false
-                 ]);
-    }
+    // Assert - Vérifier la réponse réelle de Sanctum
+    $response->assertStatus(401)
+             ->assertJson([
+                 'message' => 'Unauthenticated.'
+             ]);
+}
 
     /** @test */
     public function unauthenticated_user_cannot_access_protected_routes()

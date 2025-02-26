@@ -3,9 +3,10 @@ import axios from '../../../config/axiosConfig';
 import AdminSidebar from './components/AdminSidebar';
 
 const MeetingManagement = () => {
+  // États
   const [meetings, setMeetings] = useState([]);
   const [artists, setArtists] = useState([]);
-  const [newMeeting, setNewMeeting] = useState({
+  const [formData, setFormData] = useState({
     artist_id: '',
     title: '',
     description: '',
@@ -15,63 +16,107 @@ const MeetingManagement = () => {
     venue: '',
     type: ''
   });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Récupérer la liste des rencontres et des artistes
+  // Chargement initial des rencontres et des artistes
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [meetingsResponse, artistsResponse] = await Promise.all([
-          axios.get('/api/meetings'),
-          axios.get('/api/artists')
-        ]);
-        setMeetings(meetingsResponse.data);
-        setArtists(artistsResponse.data);
-        setLoading(false);
-      } catch (err) {
-        setError('Erreur lors du chargement des données');
-        setLoading(false);
-      }
-    };
-
     fetchData();
   }, []);
 
-  // Ajouter une nouvelle rencontre
-  const handleAddMeeting = async (e) => {
+  // Récupération des rencontres et des artistes
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [meetingsResponse, artistsResponse] = await Promise.all([
+        axios.get('/api/meetings'),
+        axios.get('/api/artists')
+      ]);
+      setMeetings(meetingsResponse.data);
+      setArtists(artistsResponse.data);
+      setError(null);
+    } catch (err) {
+      setError('Erreur lors du chargement des données');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gestion du formulaire
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/meetings', newMeeting);
-      setMeetings([...meetings, response.data]);
-      setNewMeeting({
-        artist_id: '',
-        title: '',
-        description: '',
-        date: '',
-        start_time: '',
-        end_time: '',
-        venue: '',
-        type: ''
-      });
-      setIsAdding(false);
+      if (isEditing) {
+        await axios.put(`/api/admin/meetings/${editingId}`, formData);
+      } else {
+        await axios.post('/api/admin/meetings', formData);
+      }
+      fetchData();
+      resetForm();
     } catch (err) {
-      setError('Erreur lors de l\'ajout de la rencontre');
+      setError('Erreur lors de la sauvegarde de la rencontre');
     }
   };
 
-  // Supprimer une rencontre
-  const handleDeleteMeeting = async (meetingId) => {
+  // Modification d'une rencontre
+  const handleEdit = (meeting) => {
+    setFormData({
+      artist_id: meeting.artist_id,
+      title: meeting.title,
+      description: meeting.description,
+      date: meeting.date.split('T')[0],
+      start_time: meeting.start_time,
+      end_time: meeting.end_time,
+      venue: meeting.venue,
+      type: meeting.type
+    });
+    setEditingId(meeting.id);
+    setIsEditing(true);
+    setIsAdding(true);
+  };
+
+  // Suppression d'une rencontre
+  const handleDelete = async (meetingId) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette rencontre ?')) return;
+    
     try {
-      await axios.delete(`/api/meetings/${meetingId}`);
-      setMeetings(meetings.filter(meeting => meeting.id !== meetingId));
+      await axios.delete(`/api/admin/meetings/${meetingId}`);
+      fetchData();
     } catch (err) {
-      setError('Erreur lors de la suppression de la rencontre');
+      setError('Erreur lors de la suppression');
     }
   };
 
-  if (loading) return <div>Chargement...</div>;
+  // Réinitialisation du formulaire
+  const resetForm = () => {
+    setFormData({
+      artist_id: '',
+      title: '',
+      description: '',
+      date: '',
+      start_time: '',
+      end_time: '',
+      venue: '',
+      type: ''
+    });
+    setIsAdding(false);
+    setIsEditing(false);
+    setEditingId(null);
+  };
+
+  if (loading && !isAdding && !isEditing) {
+    return (
+      <div className="flex min-h-screen">
+        <AdminSidebar />
+        <div className="ml-64 flex-1 p-6 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -83,26 +128,25 @@ const MeetingManagement = () => {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
+            <button onClick={() => setError(null)} className="float-right">&times;</button>
           </div>
         )}
 
-        {/* Bouton Ajouter */}
         {!isAdding && (
           <button 
             onClick={() => setIsAdding(true)}
-            className="bg-green-500 text-white px-4 py-2 rounded mb-4"
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded mb-4"
           >
             Ajouter une Rencontre
           </button>
         )}
 
-        {/* Formulaire d'ajout */}
         {isAdding && (
-          <form onSubmit={handleAddMeeting} className="bg-white p-6 rounded shadow-md mb-6">
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md mb-6">
             <div className="grid grid-cols-2 gap-4">
               <select
-                value={newMeeting.artist_id}
-                onChange={(e) => setNewMeeting({...newMeeting, artist_id: e.target.value})}
+                value={formData.artist_id}
+                onChange={(e) => setFormData({...formData, artist_id: e.target.value})}
                 required
                 className="border p-2 rounded"
               >
@@ -116,43 +160,43 @@ const MeetingManagement = () => {
               <input
                 type="text"
                 placeholder="Titre de la rencontre"
-                value={newMeeting.title}
-                onChange={(e) => setNewMeeting({...newMeeting, title: e.target.value})}
+                value={formData.title}
+                onChange={(e) => setFormData({...formData, title: e.target.value})}
                 required
                 className="border p-2 rounded"
               />
               <input
                 type="text"
                 placeholder="Lieu"
-                value={newMeeting.venue}
-                onChange={(e) => setNewMeeting({...newMeeting, venue: e.target.value})}
+                value={formData.venue}
+                onChange={(e) => setFormData({...formData, venue: e.target.value})}
                 required
                 className="border p-2 rounded"
               />
               <input
                 type="date"
-                value={newMeeting.date}
-                onChange={(e) => setNewMeeting({...newMeeting, date: e.target.value})}
+                value={formData.date}
+                onChange={(e) => setFormData({...formData, date: e.target.value})}
                 required
                 className="border p-2 rounded"
               />
               <input
                 type="time"
-                value={newMeeting.start_time}
-                onChange={(e) => setNewMeeting({...newMeeting, start_time: e.target.value})}
+                value={formData.start_time}
+                onChange={(e) => setFormData({...formData, start_time: e.target.value})}
                 required
                 className="border p-2 rounded"
               />
               <input
                 type="time"
-                value={newMeeting.end_time}
-                onChange={(e) => setNewMeeting({...newMeeting, end_time: e.target.value})}
+                value={formData.end_time}
+                onChange={(e) => setFormData({...formData, end_time: e.target.value})}
                 required
                 className="border p-2 rounded"
               />
               <select
-                value={newMeeting.type}
-                onChange={(e) => setNewMeeting({...newMeeting, type: e.target.value})}
+                value={formData.type}
+                onChange={(e) => setFormData({...formData, type: e.target.value})}
                 required
                 className="border p-2 rounded"
               >
@@ -165,22 +209,23 @@ const MeetingManagement = () => {
             </div>
             <textarea
               placeholder="Description"
-              value={newMeeting.description}
-              onChange={(e) => setNewMeeting({...newMeeting, description: e.target.value})}
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
               required
               className="w-full border p-2 rounded mt-4"
+              rows="4"
             />
             <div className="flex justify-between mt-4">
               <button 
                 type="submit" 
-                className="bg-blue-500 text-white px-4 py-2 rounded"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
               >
-                Enregistrer
+                {isEditing ? 'Modifier' : 'Enregistrer'}
               </button>
               <button 
                 type="button"
-                onClick={() => setIsAdding(false)}
-                className="bg-red-500 text-white px-4 py-2 rounded"
+                onClick={resetForm}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
               >
                 Annuler
               </button>
@@ -188,7 +233,6 @@ const MeetingManagement = () => {
           </form>
         )}
 
-        {/* Liste des rencontres */}
         <div className="bg-white rounded shadow-md">
           <table className="w-full">
             <thead>
@@ -196,6 +240,7 @@ const MeetingManagement = () => {
                 <th className="p-3 text-left">Titre</th>
                 <th className="p-3 text-left">Artiste</th>
                 <th className="p-3 text-left">Date</th>
+                <th className="p-3 text-left">Horaires</th>
                 <th className="p-3 text-left">Lieu</th>
                 <th className="p-3 text-left">Type</th>
                 <th className="p-3 text-left">Actions</th>
@@ -206,13 +251,20 @@ const MeetingManagement = () => {
                 <tr key={meeting.id} className="border-b">
                   <td className="p-3">{meeting.title}</td>
                   <td className="p-3">{meeting.artist?.name || 'Non spécifié'}</td>
-                  <td className="p-3">{meeting.date}</td>
+                  <td className="p-3">{new Date(meeting.date).toLocaleDateString()}</td>
+                  <td className="p-3">{meeting.start_time} - {meeting.end_time}</td>
                   <td className="p-3">{meeting.venue}</td>
                   <td className="p-3">{meeting.type}</td>
                   <td className="p-3">
                     <button 
-                      onClick={() => handleDeleteMeeting(meeting.id)}
-                      className="bg-red-500 text-white px-3 py-1 rounded mr-2"
+                      onClick={() => handleEdit(meeting)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded mr-2"
+                    >
+                      Modifier
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(meeting.id)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
                     >
                       Supprimer
                     </button>

@@ -1,71 +1,141 @@
-describe('Gestion des Rencontres Artistes', () => {
-    beforeEach(() => {
-      // Simuler une connexion et accéder à la page de gestion des rencontres
-      cy.visit('http://localhost:3000/admin/login')
-      cy.get('input[type="email"]').type('admin@example.com')
-      cy.get('input[type="password"]').type('motdepasse123')
-      cy.get('button[type="submit"]').click()
-      cy.visit('/admin/meetings')
-    })
+describe('Gestion des Concerts - CRUD', () => {
+  // Configuration de base
+  const adminEmail = 'hamdane.khiari@gmail.com'
+  const adminPassword = 'Admin123!'
   
-    it('Doit charger la page de gestion des rencontres', () => {
-      cy.get('h1').contains('Gestion des Rencontres Artistes').should('be.visible')
-      cy.get('table').should('be.visible')
-      cy.get('button').contains('Ajouter une Rencontre').should('be.visible')
-    })
-  
-    it('Doit ouvrir le formulaire d\'ajout de rencontre', () => {
-      cy.contains('Ajouter une Rencontre').click()
+  // Utilitaire pour générer un nom unique
+  const generateUniqueName = () => `Concert Test ${Date.now()}`
+
+  // Gestion des exceptions
+  beforeEach(() => {
+    cy.on('uncaught:exception', () => false)
+  })
+
+  // Connexion et navigation avant chaque test
+  beforeEach(() => {
+    // Connexion
+    cy.visit('http://localhost:3000/admin/login')
+    cy.get('input[type="email"]').type(adminEmail)
+    cy.get('input[type="password"]').type(adminPassword)
+    cy.get('button[type="submit"]').click()
+
+    // Vérification de la connexion et navigation
+    cy.url().should('include', '/admin/dashboard')
+    cy.contains('Concerts').click()
+    cy.url().should('include', '/admin/concerts')
+  })
+
+  it('Doit afficher la liste des concerts depuis le backend', () => {
+    // Attendre le chargement de la page
+    cy.wait(1000)
+
+    // Vérifier que le tableau est visible
+    cy.get('table').should('be.visible')
+
+    // Vérifier que le tableau contient des lignes
+    cy.get('tbody tr').should('have.length.greaterThan', 0)
+
+    // Vérifier les en-têtes du tableau
+    cy.get('thead th').should('contain', 'Nom')
+    cy.get('thead th').should('contain', 'Date')
+    cy.get('thead th').should('contain', 'Horaires')
+    cy.get('thead th').should('contain', 'Lieu')
+    cy.get('thead th').should('contain', 'Type')
+
+    // Vérifier que chaque ligne a les colonnes attendues
+    cy.get('tbody tr').each(($row) => {
+      cy.wrap($row).find('td').should('have.length', 6) // Nom, Date, Horaires, Lieu, Type, Actions
       
-      // Vérifier la présence des champs du formulaire
-      cy.get('select[value=""]').contains('Sélectionner un artiste').should('be.visible')
-      cy.get('input[placeholder="Titre de la rencontre"]').should('be.visible')
-      cy.get('input[placeholder="Lieu"]').should('be.visible')
-      cy.get('input[type="date"]').should('be.visible')
-      cy.get('input[type="time"]').should('have.length', 2) // Heure de début et de fin
-      cy.get('select[value=""]').contains('Type de rencontre').should('be.visible')
-      cy.get('textarea[placeholder="Description"]').should('be.visible')
-    })
-  
-    it('Doit ajouter une nouvelle rencontre', () => {
-      cy.contains('Ajouter une Rencontre').click()
-      
-      // Remplir le formulaire
-      // Note : Assurez-vous que la liste des artistes est chargée
-      cy.get('select').eq(0).find('option').should('have.length.greaterThan', 1)
-      cy.get('select').eq(0).select('1') // Sélectionner le premier artiste
-      
-      cy.get('input[placeholder="Titre de la rencontre"]').type('Meet & Greet de Test')
-      cy.get('input[placeholder="Lieu"]').type('Zone VIP')
-      cy.get('input[type="date"]').type('2024-08-16')
-      cy.get('input[type="time"]').eq(0).type('18:00') // Heure de début
-      cy.get('input[type="time"]').eq(1).type('19:30') // Heure de fin
-      cy.get('select').eq(1).select('Meet & Greet')
-      cy.get('textarea[placeholder="Description"]').type('Une rencontre exclusive avec nos artistes')
-      
-      // Soumettre le formulaire
-      cy.get('button').contains('Enregistrer').click()
-      
-      // Vérifier l'ajout dans le tableau
-      cy.get('table').contains('Meet & Greet de Test').should('be.visible')
-    })
-  
-    it('Doit permettre la suppression d\'une rencontre', () => {
-      // Intercepter la requête de suppression
-      cy.intercept('DELETE', '/api/meetings/*').as('deleteMeeting')
-      
-      // Trouver et supprimer la première rencontre
-      cy.get('table tbody tr').first().then(($row) => {
-        const meetingTitle = $row.find('td:first').text()
-        
-        // Cliquer sur le bouton Supprimer
-        cy.wrap($row).find('button').contains('Supprimer').click()
-        
-        // Attendre la suppression
-        cy.wait('@deleteMeeting')
-        
-        // Vérifier que la rencontre n'est plus dans la liste
-        cy.get('table').should('not.contain', meetingTitle)
+      // Vérifier que chaque colonne n'est pas vide
+      cy.wrap($row).find('td').each(($cell) => {
+        cy.wrap($cell).invoke('text').should('not.be.empty')
       })
     })
   })
+
+  it('Doit créer un nouveau concert', () => {
+    // Générer un nom unique
+    const concertName = generateUniqueName()
+    
+    // Ouvrir le formulaire d'ajout
+    cy.contains('Ajouter un Concert').click()
+
+    // Remplir le formulaire
+    cy.get('input[placeholder="Nom du concert"]')
+      .should('be.visible')
+      .type(concertName)
+
+    cy.get('input[placeholder="Lieu"]')
+      .should('be.visible')
+      .type('Salle de Test')
+
+    cy.get('input[type="date"]')
+      .should('be.visible')
+      .type('2025-09-15')
+
+    cy.get('input[type="time"]').eq(0)
+      .should('be.visible')
+      .type('19:30')
+
+    cy.get('input[type="time"]').eq(1)
+      .should('be.visible')
+      .type('22:30')
+
+    cy.get('input[placeholder="Type de concert"]')
+      .should('be.visible')
+      .type('Rock')
+
+    cy.get('textarea')
+      .should('be.visible')
+      .type('Description de test')
+    
+    // Soumettre le formulaire
+    cy.get('form button[type="submit"]').click()
+    
+    // Vérifier le résultat
+    cy.contains(concertName).should('be.visible')
+  })
+
+  it('Doit modifier un concert existant', () => {
+    // Attendre le chargement
+    cy.wait(1000)
+
+    // Sélectionner le premier concert
+    cy.get('tbody tr').first().find('button').contains('Modifier').click()
+
+    // Générer un nouveau nom
+    const newConcertName = generateUniqueName()
+    
+    // Modifier le nom du concert
+    cy.get('input[placeholder="Nom du concert"]')
+      .should('be.visible')
+      .clear()
+      .type(newConcertName)
+    
+    // Soumettre le formulaire
+    cy.get('form button[type="submit"]').click()
+    
+    // Vérifier le résultat
+    cy.contains(newConcertName).should('be.visible')
+  })
+
+  it('Doit supprimer un concert', () => {
+    // Attendre le chargement
+    cy.wait(1000)
+
+    // Récupérer le nom du premier concert
+    cy.get('tbody tr').first().find('td').eq(0).invoke('text').then((text) => {
+      const concertName = text.trim()
+      
+      // Supprimer le concert
+      cy.get('tbody tr').first().find('button').contains('Supprimer').click()
+      
+      // Confirmer la suppression
+      cy.on('window:confirm', () => true)
+      
+      // Vérifier la suppression
+      cy.wait(1000)
+      cy.contains(concertName).should('not.exist')
+    })
+  })
+})

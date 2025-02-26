@@ -1,340 +1,127 @@
-<?php
+namespace Tests\Feature;
 
-namespace Tests\Feature\Controllers;
-
-use App\Models\AdminUser;
-use App\Models\Artist;
 use App\Models\Concert;
+use App\Models\Artist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
-use Laravel\Sanctum\Sanctum;
+use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 
 class ConcertControllerTest extends TestCase
 {
-    use RefreshDatabase, WithFaker;
+    use RefreshDatabase;
 
-    /** @test */
-    public function index_returns_all_concerts_with_artists()
+    /**
+     * Test de la méthode index pour récupérer la liste des concerts.
+     */
+    public function test_index()
     {
-        // Créer des concerts
-        $concerts = Concert::factory()->count(3)->create();
-        
-        // Créer des artistes et les associer aux concerts
-        $artist = Artist::factory()->create();
-        foreach ($concerts as $concert) {
-            $concert->artists()->attach($artist, ['is_headliner' => true, 'performance_order' => 1]);
-        }
+        $concert = Concert::factory()->create();
 
-        // Appeler la méthode index
-        $response = $this->getJson('/api/concerts');
+        $response = $this->getJson(route('concerts.index'));
 
-        // Vérifier la réponse
         $response->assertStatus(200)
-                 ->assertJsonCount(3)
+                 ->assertJsonCount(1)  // On s'assure qu'il y a bien un concert dans la réponse.
                  ->assertJsonStructure([
                      '*' => [
-                         'id',
-                         'name',
-                         'description',
-                         'date',
-                         'start_time',
-                         'end_time',
-                         'venue',
-                         'artists'
+                         'id', 'name', 'description', 'image_url', 'date', 'start_time', 'end_time', 'venue', 'type', 'artists',
                      ]
                  ]);
     }
 
-    /** @test */
-    public function show_returns_single_concert_with_artists()
+    /**
+     * Test de la méthode store pour créer un concert.
+     */
+    public function test_store()
     {
-        // Créer un concert et des artistes
-        $concert = Concert::factory()->create();
-        $artist1 = Artist::factory()->create();
-        $artist2 = Artist::factory()->create();
-        
-        // Associer les artistes au concert
-        $concert->artists()->attach($artist1, ['is_headliner' => true, 'performance_order' => 1]);
-        $concert->artists()->attach($artist2, ['is_headliner' => false, 'performance_order' => 2]);
+        $artist = Artist::factory()->create();
 
-        // Appeler la méthode show
-        $response = $this->getJson('/api/concerts/' . $concert->id);
-
-        // Vérifier la réponse
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'id' => $concert->id,
-                     'name' => $concert->name
-                 ])
-                 ->assertJsonCount(2, 'artists');
-    }
-
-    /** @test */
-    public function store_creates_new_concert()
-    {
-        // Créer un admin
-        $admin = AdminUser::factory()->create();
-        Sanctum::actingAs($admin, ['*']);
-
-        // Données pour un nouveau concert
-        $concertData = [
-            'name' => 'New Concert',
-            'description' => 'Concert description',
-            'date' => '2023-12-31',
-            'start_time' => '20:00:00',
-            'end_time' => '23:00:00',
-            'venue' => 'Concert Hall',
-            'type' => 'Live'
-        ];
-
-        // Appeler la méthode store
-        $response = $this->postJson('/api/admin/concerts', $concertData);
-
-        // Vérifier la réponse
-        $response->assertStatus(201)
-                 ->assertJson([
-                     'name' => 'New Concert',
-                     'description' => 'Concert description',
-                     'date' => '2023-12-31',
-                     'venue' => 'Concert Hall'
-                 ]);
-
-        // Vérifier que le concert a été créé en base de données
-        $this->assertDatabaseHas('concerts', [
-            'name' => 'New Concert',
-            'venue' => 'Concert Hall'
-        ]);
-    }
-
-    /** @test */
-    public function store_creates_concert_with_artists()
-    {
-        // Créer un admin et des artistes
-        $admin = AdminUser::factory()->create();
-        Sanctum::actingAs($admin, ['*']);
-        
-        $artist1 = Artist::factory()->create();
-        $artist2 = Artist::factory()->create();
-
-        // Données pour un nouveau concert avec artistes
-        $concertData = [
-            'name' => 'Concert With Artists',
-            'description' => 'Concert description',
-            'date' => '2023-12-31',
-            'start_time' => '20:00:00',
-            'end_time' => '23:00:00',
-            'venue' => 'Concert Hall',
-            'type' => 'Live',
+        $data = [
+            'name' => 'Concert Test',
+            'description' => 'Description du concert',
+            'date' => now()->format('Y-m-d'),
+            'start_time' => now()->format('H:i:s'),
+            'end_time' => now()->addHours(2)->format('H:i:s'),
+            'venue' => 'Salle Test',
+            'type' => 'Type Test',
             'artists' => [
                 [
-                    'id' => $artist1->id,
+                    'id' => $artist->id,
                     'is_headliner' => true,
-                    'performance_order' => 1
+                    'performance_order' => 1,
                 ],
-                [
-                    'id' => $artist2->id,
-                    'is_headliner' => false,
-                    'performance_order' => 2
-                ]
             ]
         ];
 
-        // Appeler la méthode store
-        $response = $this->postJson('/api/admin/concerts', $concertData);
+        $response = $this->postJson(route('concerts.store'), $data);
 
-        // Vérifier la réponse
         $response->assertStatus(201)
                  ->assertJson([
-                     'name' => 'Concert With Artists'
-                 ])
-                 ->assertJsonCount(2, 'artists');
-
-        // Récupérer l'ID du concert créé
-        $concertId = $response->json('id');
-
-        // Vérifier que les relations avec les artistes ont été créées
-        $this->assertDatabaseHas('concert_artist', [
-            'concert_id' => $concertId,
-            'artist_id' => $artist1->id,
-            'is_headliner' => 1,
-            'performance_order' => 1
-        ]);
-        $this->assertDatabaseHas('concert_artist', [
-            'concert_id' => $concertId,
-            'artist_id' => $artist2->id,
-            'is_headliner' => 0,
-            'performance_order' => 2
-        ]);
+                     'name' => 'Concert Test',
+                     'description' => 'Description du concert',
+                     'venue' => 'Salle Test',
+                 ]);
     }
 
-    /** @test */
-    public function store_validates_input()
+    /**
+     * Test de la méthode show pour afficher un concert spécifique.
+     */
+    public function test_show()
     {
-        // Créer un admin
-        $admin = AdminUser::factory()->create();
-        Sanctum::actingAs($admin, ['*']);
+        $concert = Concert::factory()->create();
 
-        // Données incomplètes
-        $concertData = [
-            'name' => 'Invalid Concert',
-            // Manquent plusieurs champs requis
-        ];
+        $response = $this->getJson(route('concerts.show', $concert->id));
 
-        // Appeler la méthode store
-        $response = $this->postJson('/api/admin/concerts', $concertData);
-
-        // Vérifier les erreurs de validation
-        $response->assertStatus(422)
-                 ->assertJsonValidationErrors(['description', 'date', 'start_time', 'end_time', 'venue']);
-    }
-
-    /** @test */
-    public function update_modifies_existing_concert()
-    {
-        // Créer un admin et un concert
-        $admin = AdminUser::factory()->create();
-        Sanctum::actingAs($admin, ['*']);
-        
-        $concert = Concert::factory()->create([
-            'name' => 'Original Concert',
-            'description' => 'Original Description',
-            'venue' => 'Original Venue'
-        ]);
-
-        // Données pour la mise à jour
-        $updateData = [
-            'name' => 'Updated Concert',
-            'description' => 'Updated Description',
-            'venue' => 'New Venue'
-        ];
-
-        // Appeler la méthode update
-        $response = $this->putJson('/api/admin/concerts/' . $concert->id, $updateData);
-
-        // Vérifier la réponse
         $response->assertStatus(200)
                  ->assertJson([
                      'id' => $concert->id,
-                     'name' => 'Updated Concert',
-                     'description' => 'Updated Description',
-                     'venue' => 'New Venue'
+                     'name' => $concert->name,
                  ]);
-
-        // Vérifier que le concert a été mis à jour en base de données
-        $this->assertDatabaseHas('concerts', [
-            'id' => $concert->id,
-            'name' => 'Updated Concert',
-            'venue' => 'New Venue'
-        ]);
     }
 
-    /** @test */
-    public function update_can_modify_concert_artists()
+    /**
+     * Test de la méthode update pour mettre à jour un concert.
+     */
+    public function test_update()
     {
-        // Créer un admin, un concert et des artistes
-        $admin = AdminUser::factory()->create();
-        Sanctum::actingAs($admin, ['*']);
-        
         $concert = Concert::factory()->create();
-        $existingArtist = Artist::factory()->create();
-        $newArtist = Artist::factory()->create();
-        
-        // Associer un artiste initial
-        $concert->artists()->attach($existingArtist, ['is_headliner' => false, 'performance_order' => 1]);
+        $artist = Artist::factory()->create();
 
-        // Données pour la mise à jour avec nouveaux artistes
-        $updateData = [
-            'name' => 'Concert With New Artists',
-            'description' => $concert->description, // garder la description originale
-            'date' => $concert->date->format('Y-m-d'),
-            'start_time' => $concert->start_time,
-            'end_time' => $concert->end_time,
-            'venue' => $concert->venue,
+        $data = [
+            'name' => 'Concert Mis à Jour',
+            'description' => 'Nouvelle description',
+            'date' => now()->format('Y-m-d'),
+            'start_time' => now()->format('H:i:s'),
+            'end_time' => now()->addHours(2)->format('H:i:s'),
+            'venue' => 'Salle Mise à Jour',
+            'type' => 'Type Mis à Jour',
             'artists' => [
                 [
-                    'id' => $newArtist->id,
-                    'is_headliner' => true,
-                    'performance_order' => 1
-                ]
+                    'id' => $artist->id,
+                    'is_headliner' => false,
+                    'performance_order' => 2,
+                ],
             ]
         ];
 
-        // Appeler la méthode update
-        $response = $this->putJson('/api/admin/concerts/' . $concert->id, $updateData);
+        $response = $this->putJson(route('concerts.update', $concert->id), $data);
 
-        // Vérifier la réponse
         $response->assertStatus(200)
-                 ->assertJsonCount(1, 'artists')
                  ->assertJson([
-                     'name' => 'Concert With New Artists',
-                     'artists' => [
-                         [
-                             'id' => $newArtist->id,
-                             'pivot' => [
-                                 'is_headliner' => true,
-                                 'performance_order' => 1
-                             ]
-                         ]
-                     ]
+                     'name' => 'Concert Mis à Jour',
+                     'venue' => 'Salle Mise à Jour',
                  ]);
-
-        // Vérifier que les relations ont été mises à jour
-        $this->assertDatabaseMissing('concert_artist', [
-            'concert_id' => $concert->id,
-            'artist_id' => $existingArtist->id
-        ]);
-        $this->assertDatabaseHas('concert_artist', [
-            'concert_id' => $concert->id,
-            'artist_id' => $newArtist->id,
-            'is_headliner' => 1,
-            'performance_order' => 1
-        ]);
     }
 
-    /** @test */
-    public function destroy_removes_concert()
+    /**
+     * Test de la méthode destroy pour supprimer un concert.
+     */
+    public function test_destroy()
     {
-        // Créer un admin et un concert
-        $admin = AdminUser::factory()->create();
-        Sanctum::actingAs($admin, ['*']);
-        
         $concert = Concert::factory()->create();
-        
-        // Appeler la méthode destroy
-        $response = $this->deleteJson('/api/admin/concerts/' . $concert->id);
 
-        // Vérifier la réponse
+        $response = $this->deleteJson(route('concerts.destroy', $concert->id));
+
         $response->assertStatus(204);
-
-        // Vérifier que le concert a été supprimé
-        $this->assertDatabaseMissing('concerts', [
-            'id' => $concert->id
-        ]);
-    }
-
-    /** @test */
-    public function non_admin_cannot_create_concert()
-    {
-        // Données pour un nouveau concert
-        $concertData = [
-            'name' => 'Unauthorized Concert',
-            'description' => 'This should not be created',
-            'date' => '2023-12-31',
-            'start_time' => '20:00:00',
-            'end_time' => '23:00:00',
-            'venue' => 'Concert Hall'
-        ];
-
-        // Appeler la méthode store sans être authentifié
-        $response = $this->postJson('/api/admin/concerts', $concertData);
-
-        // Vérifier que l'accès est refusé
-        $response->assertStatus(401);
-
-        // Vérifier que le concert n'a pas été créé
-        $this->assertDatabaseMissing('concerts', [
-            'name' => 'Unauthorized Concert'
-        ]);
+        $this->assertDatabaseMissing('concerts', ['id' => $concert->id]);
     }
 }

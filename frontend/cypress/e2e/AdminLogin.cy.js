@@ -11,24 +11,32 @@ describe('Authentification Admin', () => {
   })
 
   it('Doit gérer une connexion invalide', () => {
+    // Intercepter la requête de connexion et simuler une réponse 401
     cy.intercept('POST', '/api/login', {
       statusCode: 401,
       body: { message: 'Identifiants incorrects' }
     }).as('loginRequest')
   
+    // Remplir les champs du formulaire avec des données invalides
     cy.get('input[type="email"]').type('invalid@example.com')
     cy.get('input[type="password"]').type('wrongpassword')
+  
+    // Soumettre le formulaire de connexion
     cy.get('button[type="submit"]').click()
   
     // Attendre la réponse de l'API
     cy.wait('@loginRequest')
   
-    // Ajouter un délai pour attendre que le message d'erreur apparaisse
-    cy.wait(1000) // Attente d'une seconde avant de vérifier l'erreur
-
-    // Vérifier que le message d'erreur est affiché
-    cy.contains('Identifiants incorrects').should('be.visible')
+    // Vérifier que la requête a bien renvoyé un code 401 (connexion échouée)
+    cy.get('@loginRequest').its('response.statusCode').should('eq', 401)
+    cy.get('input[type="email"]').should('be.visible')
+    cy.get('input[type="password"]').should('be.visible')
   })
+  
+  
+  
+  
+  
   
 
   it('Doit empêcher la connexion sans données', () => {

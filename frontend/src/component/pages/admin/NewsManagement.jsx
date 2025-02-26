@@ -4,61 +4,115 @@ import AdminSidebar from './components/AdminSidebar';
 
 const NewsManagement = () => {
   const [news, setNews] = useState([]);
-  const [newNews, setNewNews] = useState({
+  const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
     importance: ''
   });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Récupérer la liste des actualités
   useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        const response = await axios.get('/api/news');
-        setNews(response.data);
-        setLoading(false);
-      } catch (err) {
-        setError('Erreur lors du chargement des actualités');
-        setLoading(false);
-      }
-    };
-
     fetchNews();
   }, []);
 
-  // Ajouter une nouvelle actualité
-  const handleAddNews = async (e) => {
-    e.preventDefault();
+  // Fonction pour récupérer les actualités
+  const fetchNews = async () => {
     try {
-      const response = await axios.post('/api/news', newNews);
-      setNews([...news, response.data]);
-      setNewNews({
-        title: '',
-        description: '',
-        category: '',
-        importance: ''
-      });
-      setIsAdding(false);
+      setLoading(true);
+      const response = await axios.get('/api/news');
+      setNews(response.data);
+      setError(null);
     } catch (err) {
-      setError('Erreur lors de l\'ajout de l\'actualité');
+      setError('Erreur lors du chargement des actualités');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Supprimer une actualité
-  const handleDeleteNews = async (newsId) => {
+  // Gestion du formulaire (ajout et modification)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation côté client
+    if (!formData.title || !formData.description || !formData.category || !formData.importance) {
+      setError('Tous les champs sont obligatoires');
+      return;
+    }
+
     try {
-      await axios.delete(`/api/news/${newsId}`);
-      setNews(news.filter(item => item.id !== newsId));
+      if (isEditing) {
+        await axios.put(`/api/admin/news/${editingId}`, formData);
+      } else {
+        await axios.post('/api/admin/news', formData);
+      }
+      
+      fetchNews();
+      resetForm();
+    } catch (err) {
+      setError('Erreur lors de la sauvegarde de l\'actualité : ' + 
+        (err.response?.data?.errors ? 
+          Object.values(err.response.data.errors).flat().join(', ') : 
+          'Erreur inconnue')
+      );
+    }
+  };
+
+  // Modification d'une actualité
+  const handleEdit = (newsItem) => {
+    setFormData({
+      title: newsItem.title,
+      description: newsItem.description,
+      category: newsItem.category,
+      importance: newsItem.importance
+    });
+    setEditingId(newsItem.id);
+    setIsEditing(true);
+    setIsAdding(true);
+  };
+
+  // Suppression d'une actualité
+  const handleDelete = async (newsId) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette actualité ?')) return;
+
+    try {
+      await axios.delete(`/api/admin/news/${newsId}`);
+      fetchNews();
+      setError(null);
     } catch (err) {
       setError('Erreur lors de la suppression de l\'actualité');
     }
   };
 
-  if (loading) return <div>Chargement...</div>;
+  // Réinitialisation du formulaire
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      category: '',
+      importance: ''
+    });
+    setIsAdding(false);
+    setIsEditing(false);
+    setEditingId(null);
+  };
+
+  // Gestion du chargement
+  if (loading && !isAdding && !isEditing) {
+    return (
+      <div className="flex min-h-screen">
+        <AdminSidebar />
+        <div className="ml-64 flex-1 p-6 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -70,6 +124,12 @@ const NewsManagement = () => {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
+            <button 
+              onClick={() => setError(null)} 
+              className="float-right font-bold"
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -77,27 +137,27 @@ const NewsManagement = () => {
         {!isAdding && (
           <button 
             onClick={() => setIsAdding(true)}
-            className="bg-green-500 text-white px-4 py-2 rounded mb-4"
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded mb-4"
           >
             Ajouter une Actualité
           </button>
         )}
 
-        {/* Formulaire d'ajout */}
+        {/* Formulaire d'ajout/modification */}
         {isAdding && (
-          <form onSubmit={handleAddNews} className="bg-white p-6 rounded shadow-md mb-6">
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md mb-6">
             <div className="grid grid-cols-2 gap-4">
               <input
                 type="text"
                 placeholder="Titre de l'actualité"
-                value={newNews.title}
-                onChange={(e) => setNewNews({...newNews, title: e.target.value})}
+                value={formData.title}
+                onChange={(e) => setFormData({...formData, title: e.target.value})}
                 required
                 className="border p-2 rounded col-span-2"
               />
               <select
-                value={newNews.category}
-                onChange={(e) => setNewNews({...newNews, category: e.target.value})}
+                value={formData.category}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
                 required
                 className="border p-2 rounded"
               >
@@ -108,8 +168,8 @@ const NewsManagement = () => {
                 <option value="Événement">Événement</option>
               </select>
               <select
-                value={newNews.importance}
-                onChange={(e) => setNewNews({...newNews, importance: e.target.value})}
+                value={formData.importance}
+                onChange={(e) => setFormData({...formData, importance: e.target.value})}
                 required
                 className="border p-2 rounded"
               >
@@ -121,8 +181,8 @@ const NewsManagement = () => {
             </div>
             <textarea
               placeholder="Description de l'actualité"
-              value={newNews.description}
-              onChange={(e) => setNewNews({...newNews, description: e.target.value})}
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
               required
               className="w-full border p-2 rounded mt-4"
               rows="4"
@@ -130,14 +190,14 @@ const NewsManagement = () => {
             <div className="flex justify-between mt-4">
               <button 
                 type="submit" 
-                className="bg-blue-500 text-white px-4 py-2 rounded"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
               >
-                Enregistrer
+                {isEditing ? 'Modifier' : 'Enregistrer'}
               </button>
               <button 
                 type="button"
-                onClick={() => setIsAdding(false)}
-                className="bg-red-500 text-white px-4 py-2 rounded"
+                onClick={resetForm}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
               >
                 Annuler
               </button>
@@ -164,8 +224,14 @@ const NewsManagement = () => {
                   <td className="p-3">{item.importance}</td>
                   <td className="p-3">
                     <button 
-                      onClick={() => handleDeleteNews(item.id)}
-                      className="bg-red-500 text-white px-3 py-1 rounded mr-2"
+                      onClick={() => handleEdit(item)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded mr-2"
+                    >
+                      Modifier
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(item.id)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
                     >
                       Supprimer
                     </button>

@@ -2,122 +2,110 @@
 
 namespace Tests\Feature\Controllers;
 
-use App\Models\News;
+use App\Models\Subscriber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class NewsControllerTest extends TestCase
+class NewsletterControllerTest extends TestCase
 {
     use RefreshDatabase;
 
     /** @test */
-    public function index_returns_all_news()
+    public function user_can_subscribe_to_newsletter()
     {
-        // Créer des actualités
-        News::factory()->count(3)->create();
+        // Données pour l'inscription
+        $subscribeData = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john.doe@example.com'
+        ];
 
-        // Appeler la méthode index
-        $response = $this->getJson('/api/news');
+        // Appeler la méthode subscribe
+        $response = $this->postJson('/api/newsletter/subscribe', $subscribeData);
 
         // Vérifier la réponse
         $response->assertStatus(200)
-                 ->assertJsonCount(3)
-                 ->assertJsonStructure([
-                     '*' => [
-                         'id',
-                         'title',
-                         'description',
-                         'category',
-                         'importance'
-                     ]
+                 ->assertJson([
+                     'message' => 'Inscription réussie!'
                  ]);
+
+        // Vérifier que l'abonné a été créé en base de données
+        $this->assertDatabaseHas('subscribers', [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john.doe@example.com'
+        ]);
     }
 
     /** @test */
-    public function show_returns_single_news()
+    public function subscribe_validates_input()
     {
-        // Créer une actualité
-        $news = News::factory()->create([
-            'title' => 'Test News',
-            'description' => 'Test Description',
-            'category' => 'Event',
-            'importance' => 3
+        // Données incomplètes
+        $subscribeData = [
+            'email' => 'john.doe@example.com'
+            // Manquent first_name et last_name
+        ];
+
+        // Appeler la méthode subscribe
+        $response = $this->postJson('/api/newsletter/subscribe', $subscribeData);
+
+        // Vérifier les erreurs de validation
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['first_name', 'last_name']);
+    }
+
+    /** @test */
+    public function subscribe_validates_email_format()
+    {
+        // Données avec un format d'email invalide
+        $subscribeData = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'invalid-email'
+        ];
+
+        // Appeler la méthode subscribe
+        $response = $this->postJson('/api/newsletter/subscribe', $subscribeData);
+
+        // Vérifier les erreurs de validation
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['email']);
+    }
+
+    /** @test */
+    public function subscribe_enforces_unique_email()
+    {
+        // Créer un abonné existant
+        Subscriber::create([
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john.doe@example.com'
         ]);
 
-        // Appeler la méthode show
-        $response = $this->getJson('/api/news/' . $news->id);
-
-        // Vérifier la réponse
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'id' => $news->id,
-                     'title' => 'Test News',
-                     'description' => 'Test Description',
-                     'category' => 'Event',
-                     'importance' => 3
-                 ]);
-    }
-
-    /** @test */
-    public function show_returns_404_for_non_existent_news()
-    {
-        // Appeler la méthode show avec un ID qui n'existe pas
-        $response = $this->getJson('/api/news/999');
-
-        // Vérifier la réponse
-        $response->assertStatus(404)
-                 ->assertJson([
-                     'message' => 'News item not found'
-                 ]);
-    }
-
-    /** @test */
-    public function store_method_is_not_accessible_publicly()
-    {
-        // Données pour une nouvelle actualité
-        $newsData = [
-            'title' => 'New News',
-            'description' => 'News Description',
-            'category' => 'Event',
-            'importance' => 2
+        // Données avec un email déjà utilisé
+        $subscribeData = [
+            'first_name' => 'Jane',
+            'last_name' => 'Smith',
+            'email' => 'john.doe@example.com'  // email déjà utilisé
         ];
 
-        // Tenter d'appeler la méthode store publiquement
-        $response = $this->postJson('/api/news', $newsData);
+        // Appeler la méthode subscribe
+        $response = $this->postJson('/api/newsletter/subscribe', $subscribeData);
 
-        // Vérifier que la route n'existe pas ou est protégée
-        $response->assertStatus(404);
+        // Vérifier les erreurs de validation
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['email']);
     }
 
     /** @test */
-    public function update_method_is_not_accessible_publicly()
+    public function unsubscribe_method_is_not_implemented()
     {
-        // Créer une actualité
-        $news = News::factory()->create();
+        // Tenter d'appeler une méthode de désinscription (qui n'existe pas)
+        $response = $this->postJson('/api/newsletter/unsubscribe', [
+            'email' => 'john.doe@example.com'
+        ]);
 
-        // Données pour la mise à jour
-        $updateData = [
-            'title' => 'Updated News',
-            'description' => 'Updated Description'
-        ];
-
-        // Tenter d'appeler la méthode update publiquement
-        $response = $this->putJson('/api/news/' . $news->id, $updateData);
-
-        // Vérifier que la route n'existe pas ou est protégée
-        $response->assertStatus(404);
-    }
-
-    /** @test */
-    public function destroy_method_is_not_accessible_publicly()
-    {
-        // Créer une actualité
-        $news = News::factory()->create();
-
-        // Tenter d'appeler la méthode destroy publiquement
-        $response = $this->deleteJson('/api/news/' . $news->id);
-
-        // Vérifier que la route n'existe pas ou est protégée
+        // Vérifier que la route n'existe pas
         $response->assertStatus(404);
     }
 }
